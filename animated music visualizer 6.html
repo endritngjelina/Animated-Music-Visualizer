@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professional Music Visualizer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 30%, #16213e 70%, #0f1419 100%);
+            color: white;
+            overflow: hidden;
+            user-select: none;
+            cursor: none;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(120, 119, 198, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(255, 103, 132, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 80%, rgba(64, 224, 208, 0.05) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .container.drag-over {
+            background: linear-gradient(135deg, #1a1a2e 0%, #2a1a3e 50%, #26214e 100%);
+        }
+
+        .container.drag-over::after {
+            content: '🎵 Drop your audio file here';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2rem;
+            font-weight: 600;
+            color: #64ffda;
+            text-align: center;
+            z-index: 100;
+            padding: 2rem;
+            border: 2px dashed #64ffda;
+            border-radius: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+            50% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            background: transparent;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(30px) saturate(120%);
+            padding: 20px 35px;
+            border-radius: 60px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.4),
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            animation: slideUp 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .controls:hover {
+            transform: translateX(-50%) translateY(-5px);
+            box-shadow: 
+                0 30px 80px rgba(0, 0, 0, 0.5),
+                0 12px 40px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        }
+
+        @keyframes slideUp {
+            from { 
+                transform: translateX(-50%) translateY(100px); 
+                opacity: 0; 
+            }
+            to { 
+                transform: translateX(-50%) translateY(0); 
+                opacity: 1; 
+            }
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-input-label {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            color: white;
+            padding: 14px 24px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            letter-spacing: 0.5px;
+            transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            border: none;
+            position: relative;
+            overflow: hidden;
+            text-transform: uppercase;
+        }
+
+        .file-input-label::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: all 0.6s ease;
+        }
+
+        .file-input-label:hover {
+            transform: translateY(-3px);
+            box-shadow: 
+                0 15px 35px rgba(102, 126, 234, 0.4),
+                0 5px 15px rgba(118, 75, 162, 0.3);
+        }
+
+        .file-input-label:hover::before {
+            left: 100%;
+        }
+
+        .file-input-label:active {
+            transform: translateY(-1px);
+        }
+
+        .play-btn {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 50%, #ff3838 100%);
+            border: none;
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 
+                0 8px 25px rgba(255, 107, 107, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        .play-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            transition: all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transform: translate(-50%, -50%);
+        }
+
+        .play-btn:hover {
+            transform: scale(1.15);
+            box-shadow: 
+                0 15px 40px rgba(255, 107, 107, 0.5),
+                0 5px 15px rgba(238, 90, 36, 0.4);
+        }
+
+        .play-btn:hover::before {
+            width: 120px;
+            height: 120px;
+        }
+
+        .play-btn:active {
+            transform: scale(1.05);
+        }
+
+        .play-btn.playing {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 50%, #2e7d32 100%);
+            animation: playingPulse 2s infinite;
+        }
+
+        @keyframes playingPulse {
+            0%, 100% { box-shadow: 0 8px 25px rgba(76, 175, 80, 0.3); }
+            50% { box-shadow: 0 8px 25px rgba(76, 175, 80, 0.6); }
+        }
+
+        .theme-selector {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            outline: none;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            backdrop-filter: blur(10px);
+        }
+
+        .theme-selector:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .theme-selector:focus {
+            border-color: #64ffda;
+            box-shadow: 0 0 0 3px rgba(100, 255, 218, 0.1);
+        }
+
+        .theme-selector option {
+            background: #1a1a2e;
+            color: white;
+            padding: 10px;
+        }
+
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .volume-control:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .volume-control span {
+            font-size: 16px;
+            opacity: 0.8;
+            transition: all 0.3s ease;
+        }
+
+        .volume-control:hover span {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .volume-slider {
+            width: 120px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            outline: none;
+            -webkit-appearance: none;
+            transition: all 0.3s ease;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(135deg, #64ffda 0%, #4fc3f7 100%);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(100, 255, 218, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .volume-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 4px 15px rgba(100, 255, 218, 0.5);
+        }
+
+        .volume-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(135deg, #64ffda 0%, #4fc3f7 100%);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        .settings-panel {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(30px) saturate(120%);
+            padding: 25px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            min-width: 240px;
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.4),
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            animation: slideLeft 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transition: all 0.3s ease;
+        }
+
+        .settings-panel:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                0 25px 70px rgba(0, 0, 0, 0.5),
+                0 10px 35px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        }
+
+        @keyframes slideLeft {
+            from { 
+                transform: translateX(100px); 
+                opacity: 0; 
+            }
+            to { 
+                transform: translateX(0); 
+                opacity: 1; 
+            }
+        }
+
+        .settings-panel h3 {
+            margin: 0 0 20px 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #64ffda;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+
+        .setting-group {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .setting-group:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .setting-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: #b0bec5;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .setting-slider {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 4px;
+            outline: none;
+            -webkit-appearance: none;
+            transition: all 0.3s ease;
+        }
+
+        .setting-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .setting-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.5);
+        }
+
+        .setting-slider:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .info-panel {
+            position: fixed;
+            top: 30px;
+            left: 30px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(30px) saturate(120%);
+            padding: 20px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 13px;
+            color: #b0bec5;
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.4),
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            animation: slideRight 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transition: all 0.3s ease;
+        }
+
+        .info-panel:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                0 25px 70px rgba(0, 0, 0, 0.5),
+                0 10px 35px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        }
+
+        @keyframes slideRight {
+            from { 
+                transform: translateX(-100px); 
+                opacity: 0; 
+            }
+            to { 
+                transform: translateX(0); 
+                opacity: 1; 
+            }
+        }
+
+        .info-panel div {
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .info-panel div:last-child {
+            margin-bottom: 0;
+        }
+
+        .fps-counter {
+            color: #4CAF50;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(30px);
+            padding: 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .loading h3 {
+            margin: 20px 0 10px 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #64ffda;
+        }
+
+        .loading p {
+            color: #b0bec5;
+            font-size: 14px;
+            margin: 0;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top: 4px solid #64ffda;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Cursor Effects */
+        .custom-cursor {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(100, 255, 218, 0.8) 0%, rgba(100, 255, 218, 0.1) 70%, transparent 100%);
+            pointer-events: none;
+            z-index: 9999;
+            transition: all 0.1s ease;
+            transform: translate(-50%, -50%);
+        }
+
+        .custom-cursor.hover {
+            width: 40px;
+            height: 40px;
+            background: radial-gradient(circle, rgba(100, 255, 218, 0.4) 0%, rgba(100, 255, 218, 0.1) 70%, transparent 100%);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .controls {
+                bottom: 20px;
+                padding: 15px 20px;
+                gap: 15px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .settings-panel {
+                top: 15px;
+                right: 15px;
+                padding: 15px;
+                min-width: 200px;
+            }
+
+            .info-panel {
+                top: 15px;
+                left: 15px;
+                padding: 15px;
+                font-size: 11px;
+            }
+
+            .play-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 18px;
+            }
+
+            .volume-slider {
+                width: 80px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .controls {
+                left: 20px;
+                right: 20px;
+                transform: none;
+                width: calc(100% - 40px);
+            }
+
+            .settings-panel {
+                right: 10px;
+                left: 10px;
+                width: calc(100% - 20px);
+                top: auto;
+                bottom: 120px;
+            }
+
+            .info-panel {
+                display: none;
+            }
+        }
+
+        /* Accessibility Improvements */
+        .controls button:focus,
+        .controls select:focus,
+        .controls input:focus {
+            outline: 2px solid #64ffda;
+            outline-offset: 2px;
+        }
+
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="canvas"></canvas>
+        
+        <div class="info-panel">
+            <div>FPS: <span class="fps-counter" id="fps">60</span></div>
+            <div>Frequency Bins: <span id="freqBins">1024</span></div>
+            <div>Peak Frequency: <span id="peakFreq">0</span> Hz</div>
+            <div>Volume: <span id="volumeDisplay">0</span>%</div>
+        </div>
+
+        <div class="settings-panel">
+            <div class="setting-group">
+                <label class="setting-label">Sensitivity</label>
+                <input type="range" class="setting-slider" id="sensitivity" min="0.1" max="3" value="1" step="0.1">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">Smoothing</label>
+                <input type="range" class="setting-slider" id="smoothing" min="0" max="0.9" value="0.8" step="0.1">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">Particle Count</label>
+                <input type="range" class="setting-slider" id="particleCount" min="50" max="500" value="200" step="50">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label">Bass Boost</label>
+                <input type="range" class="setting-slider" id="bassBoost" min="1" max="3" value="1.5" step="0.1">
+            </div>
+        </div>
+
+        <div class="loading" id="loading" style="display: none;">
+            <div class="spinner"></div>
+            <div>Loading audio...</div>
+        </div>
+
+        <div class="controls">
+            <div class="file-input-wrapper">
+                <input type="file" id="audioFile" accept="audio/*">
+                <label for="audioFile" class="file-input-label">Choose Audio</label>
+            </div>
+            
+            <button class="play-btn" id="playBtn">▶️</button>
+            
+            <select class="theme-selector" id="themeSelector">
+                <option value="neon">Neon Waves</option>
+                <option value="particles">Particle Storm</option>
+                <option value="bars">Frequency Bars</option>
+                <option value="spiral">Spiral Galaxy</option>
+                <option value="waveform">Waveform</option>
+                <option value="matrix">Matrix Rain</option>
+            </select>
+            
+            <div class="volume-control">
+                <span>🔊</span>
+                <input type="range" class="volume-slider" id="volumeSlider" min="0" max="1" value="0.7" step="0.01">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class MusicVisualizer {
+            constructor() {
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.audio = new Audio();
+                this.audioContext = null;
+                this.analyser = null;
+                this.dataArray = null;
+                this.source = null;
+                this.gainNode = null;
+                
+                this.isPlaying = false;
+                this.theme = 'neon';
+                this.particles = [];
+                this.matrixDrops = [];
+                
+                // Settings
+                this.settings = {
+                    sensitivity: 1,
+                    smoothing: 0.8,
+                    particleCount: 200,
+                    bassBoost: 1.5
+                };
+                
+                // Performance monitoring
+                this.fps = 0;
+                this.lastTime = 0;
+                this.frameCount = 0;
+                
+                this.init();
+                this.setupEventListeners();
+                this.animate();
+            }
+            
+            init() {
+                this.resizeCanvas();
+                window.addEventListener('resize', () => this.resizeCanvas());
+                
+                // Initialize particles
+                this.initParticles();
+                this.initMatrixRain();
+            }
+            
+            resizeCanvas() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            }
+            
+            setupEventListeners() {
+                const audioFile = document.getElementById('audioFile');
+                const playBtn = document.getElementById('playBtn');
+                const themeSelector = document.getElementById('themeSelector');
+                const volumeSlider = document.getElementById('volumeSlider');
+                
+                // Settings sliders
+                const sensitivitySlider = document.getElementById('sensitivity');
+                const smoothingSlider = document.getElementById('smoothing');
+                const particleCountSlider = document.getElementById('particleCount');
+                const bassBoostSlider = document.getElementById('bassBoost');
+                
+                audioFile.addEventListener('change', (e) => this.loadAudio(e.target.files[0]));
+                playBtn.addEventListener('click', () => this.togglePlay());
+                themeSelector.addEventListener('change', (e) => this.setTheme(e.target.value));
+                volumeSlider.addEventListener('input', (e) => this.setVolume(e.target.value));
+                
+                // Settings listeners
+                sensitivitySlider.addEventListener('input', (e) => {
+                    this.settings.sensitivity = parseFloat(e.target.value);
+                });
+                
+                smoothingSlider.addEventListener('input', (e) => {
+                    this.settings.smoothing = parseFloat(e.target.value);
+                    if (this.analyser) {
+                        this.analyser.smoothingTimeConstant = this.settings.smoothing;
+                    }
+                });
+                
+                particleCountSlider.addEventListener('input', (e) => {
+                    this.settings.particleCount = parseInt(e.target.value);
+                    this.initParticles();
+                });
+                
+                bassBoostSlider.addEventListener('input', (e) => {
+                    this.settings.bassBoost = parseFloat(e.target.value);
+                });
+            }
+            
+            async loadAudio(file) {
+                if (!file) return;
+                
+                document.getElementById('loading').style.display = 'block';
+                
+                try {
+                    const url = URL.createObjectURL(file);
+                    this.audio.src = url;
+                    
+                    await new Promise((resolve, reject) => {
+                        this.audio.addEventListener('canplaythrough', resolve);
+                        this.audio.addEventListener('error', reject);
+                    });
+                    
+                    this.setupAudioContext();
+                    document.getElementById('loading').style.display = 'none';
+                } catch (error) {
+                    console.error('Error loading audio:', error);
+                    document.getElementById('loading').style.display = 'none';
+                }
+            }
+            
+            setupAudioContext() {
+                if (this.audioContext) {
+                    this.audioContext.close();
+                }
+                
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                this.analyser = this.audioContext.createAnalyser();
+                this.gainNode = this.audioContext.createGain();
+                
+                this.analyser.fftSize = 2048;
+                this.analyser.smoothingTimeConstant = this.settings.smoothing;
+                
+                this.source = this.audioContext.createMediaElementSource(this.audio);
+                this.source.connect(this.analyser);
+                this.analyser.connect(this.gainNode);
+                this.gainNode.connect(this.audioContext.destination);
+                
+                this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+                
+                this.setVolume(document.getElementById('volumeSlider').value);
+            }
+            
+            togglePlay() {
+                if (!this.audio.src) return;
+                
+                if (this.isPlaying) {
+                    this.audio.pause();
+                    document.getElementById('playBtn').innerHTML = '▶️';
+                } else {
+                    if (this.audioContext.state === 'suspended') {
+                        this.audioContext.resume();
+                    }
+                    this.audio.play();
+                    document.getElementById('playBtn').innerHTML = '⏸️';
+                }
+                this.isPlaying = !this.isPlaying;
+            }
+            
+            setTheme(theme) {
+                this.theme = theme;
+                if (theme === 'particles') {
+                    this.initParticles();
+                } else if (theme === 'matrix') {
+                    this.initMatrixRain();
+                }
+            }
+            
+            setVolume(value) {
+                this.audio.volume = value;
+                if (this.gainNode) {
+                    this.gainNode.gain.value = value;
+                }
+                document.getElementById('volumeDisplay').textContent = Math.round(value * 100);
+            }
+            
+            initParticles() {
+                this.particles = [];
+                const count = this.settings.particleCount;
+                
+                for (let i = 0; i < count; i++) {
+                    this.particles.push({
+                        x: Math.random() * this.canvas.width,
+                        y: Math.random() * this.canvas.height,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        size: Math.random() * 3 + 1,
+                        color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+                        life: 1
+                    });
+                }
+            }
+            
+            initMatrixRain() {
+                this.matrixDrops = [];
+                const cols = Math.floor(this.canvas.width / 20);
+                
+                for (let i = 0; i < cols; i++) {
+                    this.matrixDrops.push({
+                        x: i * 20,
+                        y: Math.random() * this.canvas.height,
+                        speed: Math.random() * 3 + 1,
+                        chars: '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン',
+                        char: '',
+                        opacity: Math.random()
+                    });
+                }
+            }
+            
+            getAudioData() {
+                if (!this.analyser || !this.dataArray) return null;
+                
+                this.analyser.getByteFrequencyData(this.dataArray);
+                return this.dataArray;
+            }
+            
+            calculateMetrics(dataArray) {
+                if (!dataArray) return { average: 0, peak: 0, peakIndex: 0, bass: 0, mid: 0, treble: 0 };
+                
+                let sum = 0;
+                let peak = 0;
+                let peakIndex = 0;
+                
+                // Calculate bass, mid, treble
+                const bassEnd = Math.floor(dataArray.length * 0.1);
+                const midEnd = Math.floor(dataArray.length * 0.5);
+                
+                let bassSum = 0, midSum = 0, trebleSum = 0;
+                
+                for (let i = 0; i < dataArray.length; i++) {
+                    const value = dataArray[i] * this.settings.sensitivity;
+                    sum += value;
+                    
+                    if (value > peak) {
+                        peak = value;
+                        peakIndex = i;
+                    }
+                    
+                    if (i < bassEnd) {
+                        bassSum += value * this.settings.bassBoost;
+                    } else if (i < midEnd) {
+                        midSum += value;
+                    } else {
+                        trebleSum += value;
+                    }
+                }
+                
+                return {
+                    average: sum / dataArray.length,
+                    peak,
+                    peakIndex,
+                    bass: bassSum / bassEnd,
+                    mid: midSum / (midEnd - bassEnd),
+                    treble: trebleSum / (dataArray.length - midEnd)
+                };
+            }
+            
+            updateInfo(metrics, dataArray) {
+                document.getElementById('fps').textContent = this.fps;
+                document.getElementById('freqBins').textContent = dataArray ? dataArray.length : 0;
+                
+                if (metrics.peakIndex && this.audioContext) {
+                    const frequency = (metrics.peakIndex * this.audioContext.sampleRate) / (this.analyser.fftSize * 2);
+                    document.getElementById('peakFreq').textContent = Math.round(frequency);
+                }
+            }
+            
+            // Visualization themes
+            renderNeonWaves(dataArray, metrics) {
+                this.ctx.fillStyle = 'rgba(12, 12, 12, 0.1)';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                const centerY = this.canvas.height / 2;
+                const centerX = this.canvas.width / 2;
+                
+                // Multiple wave layers
+                for (let layer = 0; layer < 3; layer++) {
+                    this.ctx.beginPath();
+                    this.ctx.lineWidth = 3 - layer;
+                    
+                    const hue = (Date.now() * 0.05 + layer * 120) % 360;
+                    this.ctx.strokeStyle = `hsla(${hue}, 80%, 60%, ${0.8 - layer * 0.2})`;
+                    
+                    for (let i = 0; i < dataArray.length; i++) {
+                        const value = (dataArray[i] / 255) * metrics.bass * 0.01;
+                        const x = (i / dataArray.length) * this.canvas.width;
+                        const y = centerY + Math.sin(i * 0.05 + Date.now() * 0.001 + layer) * value * 100;
+                        
+                        if (i === 0) {
+                            this.ctx.moveTo(x, y);
+                        } else {
+                            this.ctx.lineTo(x, y);
+                        }
+                    }
+                    
+                    this.ctx.stroke();
+                }
+                
+                // Radial waves
+                this.ctx.save();
+                this.ctx.translate(centerX, centerY);
+                
+                for (let i = 0; i < 360; i += 10) {
+                    const dataIndex = Math.floor((i / 360) * dataArray.length);
+                    const value = (dataArray[dataIndex] / 255) * metrics.average * 0.01;
+                    const radius = 50 + value * 150;
+                    
+                    const x = Math.cos(i * Math.PI / 180) * radius;
+                    const y = Math.sin(i * Math.PI / 180) * radius;
+                    
+                    this.ctx.fillStyle = `hsla(${i + Date.now() * 0.1}, 70%, 60%, 0.6)`;
+                    this.ctx.fillRect(x - 2, y - 2, 4, 4);
+                }
+                
+                this.ctx.restore();
+            }
+            
+            renderParticleStorm(dataArray, metrics) {
+                this.ctx.fillStyle = 'rgba(12, 12, 12, 0.05)';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Update particles
+                this.particles.forEach((particle, index) => {
+                    const dataIndex = Math.floor((index / this.particles.length) * dataArray.length);
+                    const intensity = (dataArray[dataIndex] / 255) * metrics.average * 0.01;
+                    
+                    // Update position
+                    particle.vx += (Math.random() - 0.5) * intensity * 0.5;
+                    particle.vy += (Math.random() - 0.5) * intensity * 0.5;
+                    
+                    particle.x += particle.vx;
+                    particle.y += particle.vy;
+                    
+                    // Apply friction
+                    particle.vx *= 0.98;
+                    particle.vy *= 0.98;
+                    
+                    // Wrap around screen
+                    if (particle.x < 0) particle.x = this.canvas.width;
+                    if (particle.x > this.canvas.width) particle.x = 0;
+                    if (particle.y < 0) particle.y = this.canvas.height;
+                    if (particle.y > this.canvas.height) particle.y = 0;
+                    
+                    // Update size and color based on audio
+                    const size = particle.size + intensity * 5;
+                    const hue = (Date.now() * 0.05 + index * 2) % 360;
+                    
+                    this.ctx.fillStyle = `hsla(${hue}, 70%, 60%, ${0.3 + intensity})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(particle.x, particle.y, size, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    
+                    // Draw connections
+                    this.particles.forEach((other, otherIndex) => {
+                        if (otherIndex > index) {
+                            const dx = particle.x - other.x;
+                            const dy = particle.y - other.y;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            
+                            if (distance < 100 + intensity * 50) {
+                                this.ctx.strokeStyle = `hsla(${hue}, 50%, 50%, ${(1 - distance / 150) * intensity})`;
+                                this.ctx.lineWidth = 1;
+                                this.ctx.beginPath();
+                                this.ctx.moveTo(particle.x, particle.y);
+                                this.ctx.lineTo(other.x, other.y);
+                                this.ctx.stroke();
+                            }
+                        }
+                    });
+                });
+            }
+            
+            renderFrequencyBars(dataArray, metrics) {
+                this.ctx.fillStyle = 'rgba(12, 12, 12, 0.2)';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                const barWidth = this.canvas.width / dataArray.length;
+                
+                for (let i = 0; i < dataArray.length; i++) {
+                    const barHeight = (dataArray[i] / 255) * this.canvas.height * metrics.sensitivity * 0.01;
+                    const hue = (i / dataArray.length) * 360;
+                    
+                    // Gradient bars
+                    const gradient = this.ctx.createLinearGradient(0, this.canvas.height, 0, this.canvas.height - barHeight);
+                    gradient.addColorStop(0, `hsl(${hue}, 80%, 60%)`);
+                    gradient.addColorStop(1, `hsl(${hue + 30}, 90%, 80%)`);
+                    
+                    this.ctx.fillStyle = gradient;
+                    this.ctx.fillRect(i * barWidth, this.canvas.height - barHeight, barWidth - 1, barHeight);
+                    
+                    // Mirror effect
+                    this.ctx.fillStyle = `hsla(${hue}, 80%, 60%, 0.3)`;
+                    this.ctx.fillRect(i * barWidth, 0, barWidth - 1, barHeight * 0.5);
+                }
+            }
+            
+            renderSpiralGalaxy(dataArray, metrics) {
+                this.ctx.fillStyle = 'rgba(12, 12, 12, 0.1)';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                const centerX = this.canvas.width / 2;
+                const centerY = this.canvas.height / 2;
+                
+                this.ctx.save();
+                this.ctx.translate(centerX, centerY);
+                this.ctx.rotate(Date.now() * 0.001);
+                
+                for (let i = 0; i < dataArray.length; i += 2) {
+                    const value = (dataArray[i] / 255) * metrics.average * 0.01;
+                    const angle = (i / dataArray.length) * Math.PI * 8;
+                    const radius = (i / dataArray.length) * 300 + value * 100;
+                    
+                    const x = Math.cos(angle) * radius;
+                    const y = Math.sin(angle) * radius;
+                    
+                    const size = 2 + value * 5;
+                    const hue = (angle * 180 / Math.PI + Date.now() * 0.1) % 360;
+                    
+                    this.ctx.fillStyle = `hsla(${hue}, 70%, 60%, ${0.5 + value})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, size, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    
+                    // Add spiral arms
+                    if (i % 10 === 0) {
+                        this.ctx.strokeStyle = `hsla(${hue}, 50%, 40%, 0.3)`;
+                        this.ctx.lineWidth = 2;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(x, y);
+                        const nextAngle = ((i + 10) / dataArray.length) * Math.PI * 8;
+                        const nextRadius = ((i + 10) / dataArray.length) * 300;
+                        const nextX = Math.cos(nextAngle) * nextRadius;
+                        const nextY = Math.sin(nextAngle) * nextRadius;
+                        this.ctx.lineTo(nextX, nextY);
+                        this.ctx.stroke();
+                    }
+                }
+                
+                this.ctx.restore();
+            }
+            
+            renderWaveform(dataArray, metrics) {
+                this.ctx.fillStyle = 'rgba(12, 12, 12, 0.1)';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Get time domain data for waveform
+                const timeData = new Uint8Array(this.analyser.fftSize);
+                this.analyser.getByteTimeDomainData(timeData);
+                
+                const centerY = this.canvas.height / 2;
+                const sliceWidth = this.canvas.width / timeData.length;
+                
+                // Main waveform
+                this.ctx.lineWidth = 3;
+                this.ctx.strokeStyle = '#00ffff';
+                this.ctx.beginPath();
+                
+                for (let i = 0; i < timeData.length; i++) {
+                    const v = timeData[i] / 128.0;
+                    const y = v * centerY / 2;
+                    const x = i * sliceWidth;
+                    
+                    if (i === 0) {
+                        this.ctx.moveTo(x, centerY + y);
+                    } else {
+                        this.ctx.lineTo(x, centerY + y);
+                    }
+                }
+                
+                this.ctx.stroke();
+                
+                // Frequency overlay
+                for (let i = 0; i < dataArray.length; i += 5) {
+                    const value = dataArray[i] / 255;
+                    const x = (i / dataArray.length) * this.canvas.width;
+                    const height = value * 50;
+                    
+                    const hue = (value * 240 + Date.now() * 0.1) % 360;
+                    this.ctx.fillStyle = `hsla(${hue}, 70%, 60%, 0.6)`;
+                    this.ctx.fillRect(x - 2, centerY - height, 4, height * 2);
+                }
+            }
+            
+            renderMatrixRain(dataArray, metrics) {
+                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                this.ctx.font = '15px monospace';
+                
+                this.matrixDrops.forEach((drop, index) => {
+                    const dataIndex = Math.floor((index / this.matrixDrops.length) * dataArray.length);
+                    const intensity = (dataArray[dataIndex] / 255) * metrics.average * 0.01;
+                    
+                    // Update drop
+                    drop.y += drop.speed + intensity * 5;
+                    drop.opacity = 0.3 + intensity * 0.7;
+                    
+                    if (drop.y > this.canvas.height) {
+                        drop.y = -20;
+                        drop.x = Math.floor(Math.random() * (this.canvas.width / 20)) * 20;
+                    }
+                    
+                    // Select random character
+                    drop.char = drop.chars[Math.floor(Math.random() * drop.chars.length)];
+                    
+                    // Draw character
+                    this.ctx.fillStyle = `rgba(0, 255, 0, ${drop.opacity})`;
+                    this.ctx.fillText(drop.char, drop.x, drop.y);
+                    
+                    // Add glow effect for high intensity
+                    if (intensity > 0.5) {
+                        this.ctx.fillStyle = `rgba(255, 255, 255, ${intensity * 0.3})`;
+                        this.ctx.fillText(drop.char, drop.x, drop.y);
+                    }
+                });
+            }
+            
+            animate() {
+                const currentTime = performance.now();
+                const deltaTime = currentTime - this.lastTime;
+                
+                // Calculate FPS
+                this.frameCount++;
+                if (deltaTime >= 1000) {
+                    this.fps = Math.round((this.frameCount * 1000) / deltaTime);
+                    this.frameCount = 0;
+                    this.lastTime = currentTime;
+                }
+                
+                const dataArray = this.getAudioData();
+                const metrics = this.calculateMetrics(dataArray);
+                
+                if (dataArray) {
+                    this.updateInfo(metrics, dataArray);
+                    
+                    // Render based on current theme
+                    switch (this.theme) {
+                        case 'neon':
+                            this.renderNeonWaves(dataArray, metrics);
+                            break;
+                        case 'particles':
+                            this.renderParticleStorm(dataArray, metrics);
+                            break;
+                        case 'bars':
+                            this.renderFrequencyBars(dataArray, metrics);
+                            break;
+                        case 'spiral':
+                            this.renderSpiralGalaxy(dataArray, metrics);
+                            break;
+                        case 'waveform':
+                            this.renderWaveform(dataArray, metrics);
+                            break;
+                        case 'matrix':
+                            this.renderMatrixRain(dataArray, metrics);
+                            break;
+                    }
+                } else {
+                    // Default animation when no audio
+                    this.renderIdleAnimation();
+                }
+                
+                requestAnimationFrame(() => this.animate());
+            }
+            
+            renderIdleAnimation() {
+                this.ctx.fillStyle = 'rgba(12, 12, 12, 0.1)';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                const time = Date.now() * 0.001;
+                const centerX = this.canvas.width / 2;
+                const centerY = this.canvas.height / 2;
+                
+                // Rotating rings
+                for (let i = 0; i < 5; i++) {
+                    const radius = 50 + i * 40;
+                    const rotation = time * (0.5 + i * 0.2);
+                    
+                    this.ctx.save();
+                    this.ctx.translate(centerX, centerY);
+                    this.ctx.rotate(rotation);
+                    
+                    this.ctx.strokeStyle = `hsla(${i * 60 + time * 50}, 60%, 50%, 0.5)`;
+                    this.ctx.lineWidth = 2;
+                    this.ctx.setLineDash([10, 20]);
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
+                    this.ctx.stroke();
+                    
+                    this.ctx.restore();
+                }
+                
+                // Floating particles
+                for (let i = 0; i < 20; i++) {
+                    const x = centerX + Math.sin(time + i) * (100 + i * 10);
+                    const y = centerY + Math.cos(time * 0.7 + i) * (80 + i * 8);
+                    const size = 2 + Math.sin(time * 2 + i) * 2;
+                    
+                    this.ctx.fillStyle = `hsla(${time * 100 + i * 18}, 70%, 60%, 0.6)`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, size, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+                
+                // Pulsing text
+                this.ctx.fillStyle = `rgba(255, 255, 255, ${0.3 + Math.sin(time * 2) * 0.2})`;
+                this.ctx.font = '24px Inter, sans-serif';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText('Load an audio file to begin', centerX, centerY + 150);
+                this.ctx.textAlign = 'left';
+            }
+        }
+        
+        // Initialize the visualizer when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new MusicVisualizer();
+        });
+        
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            switch(e.code) {
+                case 'Space':
+                    e.preventDefault();
+                    document.getElementById('playBtn').click();
+                    break;
+                case 'KeyM':
+                    const volumeSlider = document.getElementById('volumeSlider');
+                    volumeSlider.value = volumeSlider.value > 0 ? 0 : 0.7;
+                    volumeSlider.dispatchEvent(new Event('input'));
+                    break;
+                case 'KeyT':
+                    const themeSelector = document.getElementById('themeSelector');
+                    const currentIndex = themeSelector.selectedIndex;
+                    themeSelector.selectedIndex = (currentIndex + 1) % themeSelector.options.length;
+                    themeSelector.dispatchEvent(new Event('change'));
+                    break;
+            }
+        });
+        
+        // Add fullscreen support
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'f' || e.key === 'F11') {
+                e.preventDefault();
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen();
+                } else {
+                    document.exitFullscreen();
+                }
+            }
+        });
+        
+        // Performance optimization: Pause animation when tab is not visible
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // Tab is hidden, reduce performance
+            } else {
+                // Tab is visible, resume full performance
+            }
+        });
+        
+        // Add touch/mobile support
+        let touchStartY = 0;
+        let touchStartX = 0;
+        
+        document.addEventListener('touchstart', (e) => {
+            touchStartY = e.touches[0].clientY;
+            touchStartX = e.touches[0].clientX;
+        });
+        
+        document.addEventListener('touchend', (e) => {
+            const touchEndY = e.changedTouches[0].clientY;
+            const touchEndX = e.changedTouches[0].clientX;
+            const deltaY = touchStartY - touchEndY;
+            const deltaX = touchStartX - touchEndX;
+            
+            // Swipe gestures
+            if (Math.abs(deltaX) > 50) {
+                const themeSelector = document.getElementById('themeSelector');
+                const currentIndex = themeSelector.selectedIndex;
+                
+                if (deltaX > 0) {
+                    // Swipe left - next theme
+                    themeSelector.selectedIndex = (currentIndex + 1) % themeSelector.options.length;
+                } else {
+                    // Swipe right - previous theme
+                    themeSelector.selectedIndex = (currentIndex - 1 + themeSelector.options.length) % themeSelector.options.length;
+                }
+                themeSelector.dispatchEvent(new Event('change'));
+            }
+            
+            if (Math.abs(deltaY) > 50 && Math.abs(deltaX) < 30) {
+                // Vertical swipe - play/pause
+                document.getElementById('playBtn').click();
+            }
+        });
+        
+        // Add drag and drop support for audio files
+        const container = document.querySelector('.container');
+        
+        container.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            container.style.background = 'linear-gradient(135deg, #0c0c0c 0%, #2a1a3e 50%, #26214e 100%)';
+        });
+        
+        container.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            container.style.background = 'linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%)';
+        });
+        
+        container.addEventListener('drop', (e) => {
+            e.preventDefault();
+            container.style.background = 'linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%)';
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type.startsWith('audio/')) {
+                const audioFile = document.getElementById('audioFile');
+                audioFile.files = files;
+                audioFile.dispatchEvent(new Event('change'));
+            }
+        });
+        
+        // Add context menu for additional options
+        document.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+    </script>
+</body>
+</html>
